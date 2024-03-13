@@ -1,13 +1,21 @@
 #include <Arduino.h>
-#include "Statistic.h"
+#include "mode_calculator.h"
+#define MAX_MEASUREMENTS 10 // Define
+int samples[MAX_MEASUREMENTS]; // Create an empty array
 
-statistic::Statistic<float, uint32_t, true> myStats;
-
-const int NUM_MEASUREMENTS = 10;
 //  defines pins numbers
 const int trigPin = 9;
 const int echoPin = 10;
 
+
+// Function to reset the array values to zero
+void resetSamples() {
+    for (int i = 0; i < MAX_MEASUREMENTS; i++) {
+        samples[i] = 0; // Reset each element to zero
+    }
+}
+
+//
 int readSensor() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(5);
@@ -19,7 +27,7 @@ int readSensor() {
   long duration = pulseIn(echoPin, HIGH);
   long distance = duration * 0.034 / 2;
   // print the distance on the serial monitor
-  Serial.print("sensed:");
+  Serial.print("sampled:");
   Serial.println(distance);
   return distance;
 }
@@ -28,46 +36,33 @@ void setup() {
   Serial.begin(115200);
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
-  myStats.clear();
+  // Reset array values by reinitializing the array
+  resetSamples();
 }
 
 void loop() {
 
-  myStats.clear(); //explicitly start clean
+  int sampleIndex = 0; // Variable to keep track of the current sample in the array
+  resetSamples();
 
-  // Perform 5 measurements
-  Serial.println("Performing 5 measurements...");
-  for (int i = 0; i < NUM_MEASUREMENTS; ++i) {
-      int distance = readSensor();
-      if (distance > 0) {
-        myStats.add(distance);
-      }
-      delay(1000); // Adjust delay as needed
+  // Perform MAX_MEASUREMENTS measurements
+  Serial.print("Performing up to ");
+  Serial.print(MAX_MEASUREMENTS);
+  Serial.println(" measurements...");
+  while (sampleIndex < MAX_MEASUREMENTS) {
+    int distance = readSensor();
+    if (distance > 0) {
+        samples[sampleIndex] = distance;
+        sampleIndex++; // Increment sampleIndex only if a valid distance is read
+    }
+    delay(1000); // Adjust delay as needed
   }
 
-  // Find the most common measurement
-  Serial.print("        Count: ");
-  Serial.println(myStats.count());
-  Serial.print("          Min: ");
-  Serial.println(myStats.minimum(), 4);
-  Serial.print("          Max: ");
-  Serial.println(myStats.maximum(), 4);
-  Serial.print("      Average: ");
-  Serial.println(myStats.average(), 4);
-  Serial.print("     variance: ");
-  Serial.println(myStats.variance(), 4);
-  Serial.print("    pop stdev: ");
-  Serial.println(myStats.pop_stdev(), 4);
-  Serial.print(" unbias stdev: ");
-  Serial.println(myStats.unbiased_stdev(), 4);
-  Serial.print("       Middle: ");
-  Serial.println(myStats.middle(), 4);
-  Serial.print("    pop stdev: ");
-  Serial.println(myStats.pop_stdev(), 4);
-  Serial.print(" range/stddev: ");
-  Serial.println(myStats.range() / myStats.pop_stdev(), 4);
+  // Calculate the mode
+  int mode = calculateMode(samples, MAX_MEASUREMENTS);
+  Serial.print("Mode: ");
+  Serial.println(mode);
   Serial.println("=====================================");
-  myStats.clear();
   // Wait before starting the next set of measurements
   delay(5000); // Adjust delay as needed
 }
