@@ -1,5 +1,46 @@
 #include <Arduino.h>
+
+////////////////////////
+// AWS IoT Integration
+#include <ArduinoMqttClient.h>
+#if defined(ARDUINO_SAMD_MKRWIFI1010) || defined(ARDUINO_SAMD_NANO_33_IOT) || defined(ARDUINO_AVR_UNO_WIFI_REV2)
+  #include <WiFiNINA.h>
+#elif defined(ARDUINO_SAMD_MKR1000)
+  #include <WiFi101.h>
+#elif defined(ARDUINO_ARCH_ESP8266)
+  #include <ESP8266WiFi.h>
+#elif defined(ARDUINO_PORTENTA_H7_M7) || defined(ARDUINO_NICLA_VISION) || defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_GIGA) || defined(ARDUINO_OPTA)
+  #include <WiFi.h>
+#elif defined(ARDUINO_PORTENTA_C33)
+  #include <WiFiC3.h>
+#elif defined(ARDUINO_UNOR4_WIFI)
+  #include <WiFiS3.h>
+#endif
+#include <WiFiClientSecure.h>
+#include "arduino_secrets.h"
+
+// To connect with SSL/TLS:
+// 1) Change WiFiClient to WiFiSSLClient.
+// 2) Change port value from 1883 to 8883.
+// 3) Change broker value to a server with a known SSL/TLS root certificate 
+//    flashed in the WiFi module.
+
+WiFiClientSecure wifiClient;
+MqttClient mqttClient(wifiClient);
+
+const char broker[] = "a1taodwra0tmmc-ats.iot.us-east-1.amazonaws.com";
+int        port     = 1883;
+const char topic[]  = "home/water-softener";
+
+const long interval = 1000;
+unsigned long previousMillis = 0;
+
+int count = 0;
+//
+////////////////////////
+
 #include "mode_calculator.h"
+
 #define MAX_MEASUREMENTS 10 // Define
 int samples[MAX_MEASUREMENTS]; // Create an empty array
 
@@ -38,6 +79,43 @@ void setup() {
   pinMode(echoPin, INPUT);
   // Reset array values by reinitializing the array
   resetSamples();
+
+  ////////////////////////
+  // AWS IoT Integration
+  // attempt to connect to WiFi network:
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+  Serial.print("Attempting to connect to WPA SSID: ");
+  Serial.println(SECRET_SSID);
+  while (WiFi.begin(SECRET_SSID, SECRET_PASS) != WL_CONNECTED) {
+    // failed, retry
+    Serial.print(".");
+    delay(5000);
+  }
+
+  Serial.println("You're connected to the network");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+
+  wifiClient.setCertificate(AWS_CERT_CRT);
+  wifiClient.setPrivateKey(AWS_CERT_PRIVATE);
+
+  Serial.print("Attempting to connect to the MQTT broker: ");
+  Serial.println(broker);
+
+  if (!mqttClient.connect(broker, port)) {
+    Serial.print("MQTT connection failed! Error code = ");
+    Serial.println(mqttClient.connectError());
+
+    while (1);
+  }
+
+  Serial.println("You're connected to the MQTT broker!");
+  Serial.println();
+  //
+  ////////////////////////
 }
 
 void loop() {
